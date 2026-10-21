@@ -21,7 +21,7 @@
     "server_url": {
       "type": "string",
       "title": "ReelBolt MCP server URL",
-      "description": "The address of your ReelBolt MCP endpoint, ending in /mcp. For ReelBolt Cloud use https://reelbolt.ai/mcp; a self-hosted installation uses its own domain plus /mcp. Claude Code connects here, then opens your browser to sign you in and ask for your approval, so there is no token to create or paste.",
+      "description": "The address of your ReelBolt MCP endpoint, ending in /mcp. For ReelBolt Cloud use https://reelbolt.ai/mcp; a self-hosted installation uses its own HTTPS domain plus /mcp (plain http is only for a local instance). Claude Code connects here, then opens your browser to sign you in and ask for your approval, so there is no token to create or paste.",
       "required": true
     }
   }
