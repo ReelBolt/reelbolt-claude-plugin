@@ -171,7 +171,9 @@ origin:
 - `/.well-known/oauth-protected-resource`
 - `/.well-known/oauth-authorization-server`
 
-A local development instance served on your own machine is `http://localhost/mcp`.
+A local development instance served on your own machine is `http://localhost/mcp`. Use `https://` for
+any deployment reachable across a network: the sign-in credential is sent to this address, and plain
+`http://` would carry it in the clear.
 
 This plugin registers the remote HTTPS endpoint only. Running the MCP bridge as a local stdio
 process is a separate setup that ships with the ReelBolt server, not with this plugin.
