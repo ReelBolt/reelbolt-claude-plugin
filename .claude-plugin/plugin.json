@@ -1,0 +1,28 @@
+{
+  "name": "reelbolt",
+  "displayName": "ReelBolt",
+  "version": "0.3.0",
+  "description": "Connect Claude Code to ReelBolt: the platform assistant's own tools over MCP (projects, files, agents, workflow authoring and execution), plus skills for inspecting a project's runs and authoring workflows. You sign in through your browser; there is no token to paste.",
+  "author": {
+    "name": "Tommaso Celano",
+    "url": "https://github.com/vecchiotom"
+  },
+  "homepage": "https://github.com/vecchiotom/reelbolt-claude-plugin",
+  "repository": "https://github.com/vecchiotom/reelbolt-claude-plugin",
+  "license": "MIT",
+  "privacyPolicyUrl": "https://reelbolt.ai/legal/privacy",
+  "keywords": [
+    "reelbolt",
+    "mcp",
+    "video",
+    "workflows"
+  ],
+  "userConfig": {
+    "server_url": {
+      "type": "string",
+      "title": "ReelBolt MCP server URL",
+      "description": "The address of your ReelBolt MCP endpoint, ending in /mcp. For ReelBolt Cloud use https://reelbolt.ai/mcp; a self-hosted installation uses its own domain plus /mcp. Claude Code connects here, then opens your browser to sign you in and ask for your approval, so there is no token to create or paste.",
+      "required": true
+    }
+  }
+}
