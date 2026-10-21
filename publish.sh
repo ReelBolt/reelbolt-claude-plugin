@@ -93,10 +93,13 @@ mkdir -p "$payload"
 git -C "$source_root" archive --format=tar "HEAD:${prefix%/}" | tar -x -C "$payload"
 
 # Defence in depth: refuse the obvious credential shapes before anything leaves.
+# Report only WHERE a shape occurs (file:line). Printing the matched text would
+# copy a real key into the terminal, a journal or a CI log — exactly where a
+# detector must not put it. The operator opens the named files locally.
 secret_hits="$(grep -rInE \
   '(BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|sk-ant-[A-Za-z0-9_-]{20,})' \
-  "$payload" || true)"
-[[ -z "$secret_hits" ]] || die "refusing to publish: possible secret in the payload:
+  "$payload" | cut -d: -f1,2 || true)"
+[[ -z "$secret_hits" ]] || die "refusing to publish: a possible credential is in the payload. Open these files locally and remove it:
 $secret_hits"
 
 if $check_only; then
