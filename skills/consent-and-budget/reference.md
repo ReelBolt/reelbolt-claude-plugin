@@ -59,8 +59,7 @@ that can spend are refused with a plain credits message.
 - **Admin tools.** Thirteen tools manage the deployment's own AI provider settings, agent
   skills and decision calibration. They are absent from the catalog unless the account's admin-tools setting is on; when
   absent, a call is refused with `MCP_ADMIN_TOOLS_DISABLED`. Claude cannot enable it.
-- **Stdio token.** The ReelBolt server's `mcp` package can also run over stdio with the
-  `REELBOLT_MCP_TOKEN` environment variable (a ReelBolt bearer token, read once at startup, forwarded
-  verbatim; the process exits if it is missing). That is for self-hosted tooling and the
-  `reelbolt-mcp-watch` command, not for this plugin, which has no token to paste.
+- **Stdio token.** Self-hosted tooling can run the ReelBolt server's `mcp` package over stdio with a
+  bearer token. That is separate from this plugin, which has no token to paste. The plugin's run
+  watcher signs in on its own, with a read-only credential (see the `run-and-watch` skill).
 - Every MCP call is recorded (tool, time, success, duration). A record is not a charge.
