@@ -1,14 +1,14 @@
 {
   "name": "reelbolt",
   "displayName": "ReelBolt",
-  "version": "0.3.0",
-  "description": "Connect Claude Code to ReelBolt: the platform assistant's own tools over MCP (projects, files, agents, workflow authoring and execution), plus skills for inspecting a project's runs and authoring workflows. You sign in through your browser; there is no token to paste.",
+  "version": "0.4.0",
+  "description": "Connect Claude Code to ReelBolt: the platform assistant's own tools over MCP (projects, files, agents, recipes, workflow authoring and execution, outputs, design system), plus skills for building from recipes, running and watching runs, inspecting results, consent and budget, and the design system. You sign in through your browser; there is no token to paste.",
   "author": {
     "name": "Tommaso Celano",
     "url": "https://github.com/vecchiotom"
   },
-  "homepage": "https://github.com/vecchiotom/reelbolt-claude-plugin",
-  "repository": "https://github.com/vecchiotom/reelbolt-claude-plugin",
+  "homepage": "https://github.com/ReelBolt/reelbolt-claude-plugin",
+  "repository": "https://github.com/ReelBolt/reelbolt-claude-plugin",
   "license": "MIT",
   "privacyPolicyUrl": "https://reelbolt.ai/legal/privacy",
   "keywords": [

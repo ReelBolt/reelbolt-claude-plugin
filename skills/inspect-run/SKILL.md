@@ -4,14 +4,15 @@ description: Inspect a ReelBolt project's workflows and the status of a recent r
 
 # Inspect a ReelBolt project and its runs
 
-Answer "what workflows does this project have?" and "how did the last run go?" with the ReelBolt MCP
+Answer "what workflows does this project have?", "how did the last run go?" and "is it done yet?" with the ReelBolt MCP
 tools. The server is registered as `reelbolt`, so in this session its tools are named
 `mcp__plugin_reelbolt_reelbolt__<ToolName>`.
 
 ## How page context crosses MCP
 
-Most project-scoped tools take **no `projectId` argument**. The MCP server adds one optional
-`context` object to every bridged tool's input schema:
+Project-scoped tools read the project from an optional `context` object, and almost all also accept
+an explicit `projectId` argument. The MCP server adds the `context` object to every bridged tool's
+input schema:
 
 ```json
 "context": {
@@ -51,14 +52,27 @@ never assume the first project in a list is the one the user meant — ask if it
    newest first. Narrow with `"workflowId"` in `arguments` when the question is about one workflow;
    `"limit"` defaults to 10. Each row carries `status`, which is one of `Queued`, `Running`,
    `Passed`, `Failed`, `Cancelled`.
-6. **Read one run in detail** — `GetWorkflowExecution` with `context: { "projectId": "<uuid>" }` and
+6. **Check a run quickly** - `GetExecutionStatus` with `{ "executionId": "<uuid>" }`. It answers at
+   once: `status`, `terminal`, progress (`stepsTotal`, `stepsDone`, the current step), credits
+   charged so far, the error if it failed and the playable `outputs`. While the run is going it adds
+   `retryAfterSeconds`. Use it to ask "is it done?"; to wait for a run see the `run-and-watch` skill.
+7. **Read one run in detail** - `GetWorkflowExecution` with `context: { "projectId": "<uuid>" }` and
    the run id in `arguments`: `{ "executionId": "<uuid>" }`. This is the call that answers "which
-   step failed, and why" — per-step status, iteration, duration, tokens, cache reuse, whether it
-   produced a video, its error, and a truncated preview of its output.
+   step failed, and why": per-step `status`, `durationMs`, `tokensUsed`, `creditsCharged`,
+   `fromCache`, `producedVideo`, `outputId`, `failureCode`, `failureClass` and `errorDetails`, plus
+   top-level `errorMessage`, `totals` and `warnings` (for example a requested resolution that was not
+   applied). Previewed step output is truncated.
+8. **Look at what a run produced** - a step with `outputId` produced a playable output. `GetOutput`
+   (`outputId`) returns its name, type, size, duration, a download link that expires in about 15
+   minutes (hand it over, do not store it) and frame sheets. `LookAtOutput` (`outputId`, optional
+   `question` and `atSeconds`) sends up to 6 stills to a vision model and answers what is on screen;
+   it costs one small model call, so use it when the user asks about the picture itself.
+9. **Check credits** - `GetCreditBalance` (no arguments) returns `balance`, `reserved` and
+   `available` in whole credits, the plan and when it renews, or `billingEnabled: false`.
 
 ## Report
 
-Give the workflow name, the run's status, the failing step, and the error text **verbatim**. Do not
+Use `GetExecutionStatus` for "is it done" and `GetWorkflowExecution` for "what went wrong". Give the workflow name, the run's status, the failing step, and the error text **verbatim**. Do not
 turn an error string into a diagnosis the error does not support. `ListWorkflowExecutions` already
 carries an `errorMessage` per run, so check there before drilling into the run. A previewed step
 output is truncated — say so rather than implying you read all of it.
@@ -68,5 +82,5 @@ output is truncated — say so rather than implying you read all of it.
 - **A refusal is a result, not a failure.** An authority refusal, a plan-gate refusal, a rate-limit
   refusal and an unknown workflow all come back as the tool's own JSON text with `isError: false`,
   because the text is meant to be read. Relay it. Retrying the identical call will not change it.
-- **Stay read-only while investigating.** The tools above write nothing. Writing is a separate,
+- **Stay read-only while investigating.** The tools above write nothing (`LookAtOutput` costs a small model call but changes no data). Writing is a separate,
   explicitly confirmed flow — see the `author-workflow` skill.

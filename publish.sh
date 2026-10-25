@@ -7,14 +7,14 @@
 # repository even by accident.
 set -euo pipefail
 
-expected_origin="${REELBOLT_PLUGIN_MIRROR_URL:-https://github.com/vecchiotom/reelbolt-claude-plugin.git}"
+expected_origin="${REELBOLT_PLUGIN_MIRROR_URL:-https://github.com/ReelBolt/reelbolt-claude-plugin.git}"
 
 usage() {
   cat <<'EOF'
 Usage: ./publish.sh [--check] <mirror-repo-dir>
 
   <mirror-repo-dir>  A checkout of the public mirror
-                     (github.com/vecchiotom/reelbolt-claude-plugin).
+                     (github.com/ReelBolt/reelbolt-claude-plugin).
 
   --check            Compare instead of publishing; exit 1 if the mirror is stale,
                      dirty, or has commits that were never pushed.
@@ -37,7 +37,7 @@ normalize_origin() {
   url="${url#git@github.com:}"
   url="${url#https://github.com/}"
   url="${url#http://github.com/}"
-  printf '%s' "$url"
+  printf '%s' "${url,,}"
 }
 
 check_only=false

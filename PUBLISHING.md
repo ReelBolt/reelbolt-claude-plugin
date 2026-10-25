@@ -1,7 +1,7 @@
 # Publishing this plugin
 
 **The source of truth is `plugins/reelbolt/` in ReelBolt's source repository.** The copy in
-`github.com/vecchiotom/reelbolt-claude-plugin` is a published mirror: do not edit it there, because
+`github.com/ReelBolt/reelbolt-claude-plugin` is a published mirror: do not edit it there, because
 the next publish overwrites it. Open an issue instead.
 
 ## Publish a change
@@ -25,6 +25,10 @@ The script:
 Commits in the public mirror are authored as `Tommaso Celano <vecchiotom@users.noreply.github.com>`,
 so a personal mailbox never appears in the public history. Override with
 `REELBOLT_PLUGIN_COMMIT_NAME` and `REELBOLT_PLUGIN_COMMIT_EMAIL` if that is wrong.
+
+A checkout of the mirror made under its old name (`vecchiotom/reelbolt-claude-plugin`) is refused by the
+script. Point it at the new address first:
+`git -C /path/to/reelbolt-claude-plugin remote set-url origin https://github.com/ReelBolt/reelbolt-claude-plugin.git`.
 
 ## Check for drift
 
