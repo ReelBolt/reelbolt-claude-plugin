@@ -3,8 +3,8 @@
 Connect Claude Code to ReelBolt, so you can work with your ReelBolt projects, workflows and
 pictures from your terminal instead of switching to the dashboard.
 
-Sign-in happens in your browser. **There is no token to create, paste or store**, and nothing has to
-be built or installed on your machine beyond the plugin itself.
+Sign-in happens in your browser. **There is no token to create or paste.** The optional run watcher
+(below) needs Node.js 22 or later; everything else needs nothing beyond the plugin itself.
 
 ## What it connects to
 
@@ -24,7 +24,10 @@ The address is always the one you sign in to, with `/mcp` on the end.
 - **Claude Code**.
 - **A ReelBolt account**. If you self-host, the address of your deployment.
 
-That is all. There is no Node.js requirement, no build step, no API key and no signing key.
+- **Node.js 22 or later**, only for the run watcher. Without it Claude Code checks a run with
+  `GetExecutionStatus` instead.
+
+There is no build step, no API key and no signing key.
 
 ## Install
 
@@ -107,8 +110,8 @@ Broadly, it can:
   patches. A custom graph is the fallback.
 - **Start a run and follow it without blocking** — subject to the same hourly limit the dashboard
   assistant has. A run can take its brief from a text file in the project. Claude Code checks a run
-  with an immediate status call, a run-resource subscription, or (where installed) the
-  `reelbolt-mcp-watch` command under its Monitor tool.
+  with the plugin's run watcher under its Monitor tool (see below), an immediate status call, or a
+  run-resource subscription.
 - **Look at results** — get a download link for a render, ask what is on screen in it, save a render
   as a project file, upload a file or import one from a link, and check the credit balance.
 - **Read and change the brand design system** — colours, fonts and tagline as a draft, and reject or
@@ -202,12 +205,44 @@ any deployment reachable across a network: the sign-in credential is sent to thi
 This plugin registers the remote HTTPS endpoint only. Running the MCP bridge as a local stdio
 process is a separate setup that ships with the ReelBolt server, not with this plugin.
 
+## Run watcher
+
+A workflow run takes minutes. The plugin includes a small command, `bin/reelbolt-watch.mjs`, that
+Claude Code starts under its Monitor tool. It prints a line each time the run changes and
+`finished: ...` when it ends, so Claude Code tells you about progress without polling.
+
+The watcher has its own one-time sign-in, separate from the MCP connection. The first time you
+watch a run, Claude Code tells you to run this yourself (in your terminal, or in Claude Code with
+the `!` prefix):
+
+```bash
+node <plugin folder>/bin/reelbolt-watch.mjs login --server https://reelbolt.ai/mcp
+```
+
+Use your own `server_url` if you self-host. Your browser opens and shows a page that names the
+workspace; approve it. There is nothing to paste back.
+
+What the credential is:
+
+- It can read the status of runs and nothing else: no tools and no changes. A status answer holds the
+  run's progress, the credits charged so far, step labels, any failure message and the ids of its
+  outputs.
+- It is its own sign-in, which you can revoke, and it is stored in `watch-credentials.json` in
+  `$REELBOLT_WATCH_HOME`, else `$XDG_CONFIG_HOME/reelbolt`, else `~/.config/reelbolt` (on Windows
+  `%APPDATA%\reelbolt`). On macOS and Linux the folder and file are readable only by you, and the
+  watcher refuses a file others can read. Windows relies on your profile folder's own permissions.
+- It is only ever sent to the ReelBolt address you signed in to.
+
+To check or revoke it, run `reelbolt-watch.mjs status` or `reelbolt-watch.mjs logout` the same way.
+`logout` revokes the sign-in on the server and deletes the file. An access token lasts one hour.
+
 ## Security notes
 
 - **No secret is shipped anywhere in this repository.** There is no default or example key or
   token, and no `userConfig` option declares one.
-- **Nothing installed on your machine can mint a ReelBolt credential.** The browser sign-in is the
-  only way one is created, and it is issued by your deployment.
+- **Nothing installed on your machine can mint a ReelBolt credential.** A browser sign-in is the
+  only way one is created, and it is issued by your deployment. The run watcher's sign-in is
+  read-only for run status.
 - **There is no fallback for `server_url`.** The plugin never guesses an address, so an unset
   option is a visible failure rather than a silent misdirection.
 - **Never give this plugin, or a server you run for it, a platform signing key.** It never asks for
@@ -224,11 +259,14 @@ process is a separate setup that ships with the ReelBolt server, not with this p
 - **Calls are refused with a permissions message.** The tool exists but your account may not use
   it, or admin tools are not enabled for you. Refusals like this are answers, not crashes — they
   say what to do next.
-- **The `reelbolt-mcp-watch` command is not found, or says authentication failed.** It ships with the
-  ReelBolt server's `mcp` package, not with this plugin, and needs `INFERENCE_API_URL` and
-  `REELBOLT_MCP_TOKEN`; the browser sign-in keeps its credential inside Claude Code, so the command
-  cannot use it. Claude Code falls back to `GetExecutionStatus`, waiting `retryAfterSeconds` between
-  looks, or to a run-resource subscription.
+- **The watcher says `not signed in`.** Run the `login` command from the Run watcher section once,
+  then ask Claude Code to watch again.
+- **The watcher says `sign-in expired`.** Run `login` again. Sign-ins expire if unused for a long
+  time or after `logout`.
+- **The watcher says `sign-in unusable`.** The saved file is damaged or readable by others. Run
+  `logout`, then `login`.
+- **`node` is not found, or is older than 22.** Install Node.js 22 or later. Until then Claude
+  Code checks runs with `GetExecutionStatus`, waiting `retryAfterSeconds` between looks.
 - **A change is refused because of footage sharing.** The permission to send footage to an outside
   service is given by you in the app, on the step. Switch it on there, then ask again.
 - **A brand change is not approved.** Approving a design change over MCP is always refused; use the

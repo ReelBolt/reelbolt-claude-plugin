@@ -36,51 +36,58 @@ unsubscribed, after its time-to-live (120 minutes by default), or when the sessi
 limits subscriptions per session (5), per person (10) and in total, so subscribe only to runs you are
 following.
 
-## `reelbolt-mcp-watch`
+## `reelbolt-watch`
+
+Run it as `node "${CLAUDE_PLUGIN_ROOT}/bin/reelbolt-watch.mjs" ...` (Node.js 22 or later):
 
 ```bash
-reelbolt-mcp-watch <executionId> [--project <projectId>] [--max-minutes 120]
+node "${CLAUDE_PLUGIN_ROOT}/bin/reelbolt-watch.mjs" <executionId> --project <projectId> [--max-minutes N]
+node "${CLAUDE_PLUGIN_ROOT}/bin/reelbolt-watch.mjs" login --server <ReelBolt MCP URL> [--no-browser]
+node "${CLAUDE_PLUGIN_ROOT}/bin/reelbolt-watch.mjs" status
+node "${CLAUDE_PLUGIN_ROOT}/bin/reelbolt-watch.mjs" logout
 ```
 
-It calls `GetExecutionStatus`, sleeps for the answer's `retryAfterSeconds` (5 seconds when absent, clamped to
-5-60; after a failed read it waits 5, 10, 20, then 40 seconds and exits after five failures in a
-row), and prints one plain line each time status, steps done or current
-step changes. Examples of lines: `running 2/6 - <step label>`, `finished: Passed`,
-`finished: Failed - <error, up to 200 characters>`, `finished: Cancelled`, `lost contact with ReelBolt`, `still running after <N> minutes`.
+The watch form calls `GetExecutionStatus`, waits the answer's `retryAfterSeconds` (clamped to
+5-60 seconds; after a failed read it waits 5, 10, 20, then 40 seconds and gives up after five
+failures in a row), and prints one plain line each time status, steps done or current step changes.
+Lines: `running 2/6 - <step label>`, `finished: Passed`,
+`finished: Failed - <error, up to 200 characters>`, `finished: Cancelled`,
+`lost contact with ReelBolt`, `still running after <N> minutes`, `cannot read this run: access denied`,
+`cannot read this run: <the server's message>` (unknown run, or the project is missing or not yours).
 
 | Exit code | Meaning |
 |---|---|
 | `0` | The run reached a final state (`Passed`, `Failed` or `Cancelled`). The last stdout line says which. |
-| `1` | Authentication failed, five consecutive failed reads, a missing environment variable, or `--max-minutes` elapsed. Authentication and missing-variable reasons go to stderr; lost contact and the time limit are the last stdout line. |
+| `1` | A problem: lost contact, access denied, or `--max-minutes` elapsed. The reason is the last stdout line or on stderr. |
 | `2` | Bad arguments. |
+| `3` | Sign-in needed. The line says `not signed in`, `sign-in expired` or `sign-in unusable`. |
 
-Stdout carries only the lines; diagnostics go to stderr, and the token is never printed.
+Stdout carries only the lines; diagnostics go to stderr. The token is never printed.
 
-### What it needs
+### Sign-in
 
-- `INFERENCE_API_URL`: the base URL of the ReelBolt Inference API.
-- `REELBOLT_MCP_TOKEN`: a ReelBolt bearer token for the same account.
-- Node.js 22.23.1 or later. The command is the `reelbolt-mcp-watch` binary of the ReelBolt server's `mcp`
-  package. It is not part of this plugin. Self-hosters get it with their ReelBolt installation.
-
-The plugin's browser sign-in stores its credential inside Claude Code, where no command can read it.
-So with the plugin alone the watch command usually cannot authenticate. If `command -v
-reelbolt-mcp-watch` finds nothing, or either variable is unset, do not ask for a token in the chat.
-Say so and use the subscription or `GetExecutionStatus`.
+`login --server <url>` takes the same address as the plugin's `server_url` (ending in `/mcp`). It
+prints an address and opens the browser, where the user approves read-only access to run status for
+one workspace. The credential is stored in `watch-credentials.json` in the ReelBolt config folder
+(`$REELBOLT_WATCH_HOME`, else `$XDG_CONFIG_HOME/reelbolt`, else `~/.config/reelbolt`; on Windows
+`%APPDATA%\reelbolt`), readable only by the user. `status` shows whether a sign-in exists; `logout`
+revokes it on the server and deletes the file. The credential reads run status and nothing else.
 
 ### Monitor recipe
 
 1. `ExecuteWorkflow` returns the `executionId`.
-2. Start Monitor with the command `reelbolt-mcp-watch <executionId> --project <projectId>`.
+2. Start Monitor with `node "${CLAUDE_PLUGIN_ROOT}/bin/reelbolt-watch.mjs" <executionId> --project <projectId>`,
+   then end the turn.
 3. For every line, update the user in one sentence. Do not call other ReelBolt tools just because a
    line arrived.
-4. When Monitor reports the command has exited with `0`, the last line starts with `finished:`. Call
-   `GetExecutionStatus` for outputs and credits, or `GetWorkflowExecution` for per-step detail, and
-   report.
-5. On exit `1`, read the last stdout line and stderr. If stderr says authentication failed or a
-   variable is missing, switch to `GetExecutionStatus` honoring `retryAfterSeconds`. If the last line
-   is `lost contact with ReelBolt` or `still running after <N> minutes`, the run may still be going:
-   check once with `GetExecutionStatus`.
+4. When the command exits with `0`, the last line starts with `finished:`. Call `GetExecutionStatus`
+   for outputs and credits, or `GetWorkflowExecution` for per-step detail, and report.
+5. On exit `3`, follow the sign-in steps in `SKILL.md`, then start Monitor again.
+6. On exit `1`, read the last line. For `lost contact with ReelBolt` or `still running after <N> minutes`
+   the run may still be going: check once with `GetExecutionStatus`. For `cannot read this run: access
+   denied`, the signed-in workspace does not own the run; say so and use `GetExecutionStatus`. For any
+   other `cannot read this run: ...` line, the run id or project id is wrong: check them with
+   `ListWorkflowExecutions` and start again.
 
 ## Chat-only: `WatchExecution`
 
