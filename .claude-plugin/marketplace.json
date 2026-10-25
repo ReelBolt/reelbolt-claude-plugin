@@ -3,15 +3,15 @@
   "description": "The ReelBolt plugin marketplace: ReelBolt's platform tools for Claude Code, over MCP.",
   "owner": {
     "name": "Tommaso Celano",
-    "url": "https://github.com/vecchiotom"
+    "url": "https://github.com/ReelBolt"
   },
   "plugins": [
     {
       "name": "reelbolt",
       "source": "./",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "license": "MIT",
-      "description": "ReelBolt for Claude Code: the platform assistant's tools over MCP, plus skills for inspecting a project's runs and authoring workflows. Point it at your ReelBolt address after install, then sign in through the browser."
+      "description": "ReelBolt for Claude Code: the platform assistant's tools over MCP, plus skills for building from recipes, running and watching runs without blocking, inspecting results, the consent and budget rules, and the design system. Point it at your ReelBolt address after install, then sign in through the browser."
     }
   ]
 }

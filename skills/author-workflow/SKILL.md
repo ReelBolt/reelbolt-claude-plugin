@@ -1,5 +1,5 @@
 ---
-description: Author or change a ReelBolt workflow through the ReelBolt MCP tools - validate, propose, get the user's confirmation, apply, then execute. Use when asked to build, edit or run a ReelBolt workflow.
+description: Build or change a ReelBolt workflow through the ReelBolt MCP tools - prefer a built-in recipe (template) over a custom graph; validate, propose, get the user's confirmation, apply, then run. Use when asked to build, edit, copy or run a ReelBolt workflow.
 ---
 
 # Author and run a ReelBolt workflow
@@ -8,50 +8,71 @@ Build a workflow from a description, or edit an existing one, with the ReelBolt 
 server is registered as `reelbolt`, so in this session its tools are named
 `mcp__plugin_reelbolt_reelbolt__<ToolName>`.
 
-Every call carries the page context in a single optional `context` argument — see the
-`inspect-run` skill for its shape. Populate at least `context.projectId`.
+Every call can carry the page context in a single optional `context` argument (see the
+`inspect-run` skill). Populate at least `context.projectId`; project-scoped tools also accept a
+`projectId` argument.
 
-## The tool set, in the order you use it
+## Recipe first, custom graph last
 
-| Tool | Writes? | What it does |
-|---|---|---|
-| `ListAgents` | no | Agents available to this project (built-in plus the project owner's custom agents). This is where `agentDefinitionId` values come from. |
-| `ListStepSchemas` | no | JSON Schema for every step type's configuration. **Call this before writing any step config** — the per-type config JSON is defined here, not guessed. |
-| `ValidateWorkflow` | no | Validates proposed steps (agent ids exist and are owned, configs match their schema) and returns the errors. Nothing is written. |
-| `ProposeWorkflow` | no | Computes a diff plus a `confirmationToken` for a proposed step set. Omit `workflowId` to propose a new workflow; supply it to propose an edit. Nothing is written. |
-| `ApplyWorkflow` | **yes** | Applies a previously proposed change. Requires the exact `confirmationToken` that `ProposeWorkflow` returned for the same `workflowId`/`name`/`steps`. |
-| `ExecuteWorkflow` | runs it | Executes an existing workflow. |
+Decide in this order and stop at the first that fits:
 
-A step names an agent (`agentDefinitionId`, from `ListAgents`), carries a `stepOrder`, and may carry
-a `label`; a step that is not a plain agent step additionally names its `stepType` and that type's
-config. Rather than hand-writing that JSON, read an existing workflow with `GetWorkflow` — it returns
-steps in exactly the shape `ValidateWorkflow` and `ProposeWorkflow` accept — and change what you
-need. `ListStepSchemas` is where a step type's config schema comes from.
+1. **Reuse.** `ListWorkflows` / `GetProjectReadiness` (its workflows list names the recipe each came
+   from). If the project already has a workflow from the right recipe, run that one.
+2. **Create from a recipe.** `ListWorkflowTemplates` with `goal` set to the user's goal (best
+   matches first; each carries `forGoals`, `needs`, `costClass`, and `satisfied` / `missing` for the
+   project). `GetWorkflowTemplate` shows its steps, `briefBindings` and `availablePatches`.
+3. **Recipe plus patches.** Add only the closed patch ids (`swapToRoom`, `addVoiceover`,
+   `addCaptions`, `addMusic`, `addSfx`, `addColorGrade`, `addGraphics`). A patch that does not fit
+   is refused with a reason; do not work around it.
+4. **Custom graph.** Only when no recipe plus patch can do it. Use the custom flow below.
+5. **Decline or ask.** If the project lacks what the recipe needs, say so.
+
+Before creating or running, price it in one line: `EstimateWorkflowRun` (`workflowId` or
+`templateKey`, optional `brief`) is free and returns a cost class, a usual range and the paid items.
+
+Create-from-recipe flow:
+
+1. `GetProjectReadiness` once: files, design system, voices, available AI capabilities, plan limits.
+2. `ProposeCreateFromTemplate` (`templateKey`, optional `brief`, `patches`, `name`). It returns a
+   `summary`, the `steps`, a `confirmationToken`, `warnings`, `alreadyFromThisRecipe` and
+   `needsBeforeRunning`.
+3. Show the user the proposal. Tell them everything in `needsBeforeRunning` (a missing provider,
+   voice, file, design system, or a consent only they can give in the app); it does not block the
+   save but the run needs it.
+4. After an explicit yes, `ApplyCreateFromTemplate` with the same arguments plus the exact token.
+   Neither tool starts a run.
+
+Read [`reference.md`](./reference.md) for argument lists, the brief fields, lint rules, patching and
+cloning, and the custom-graph details.
 
 ## Rules that are not optional
 
-1. **Validate, then propose, then show the user, then apply.** `ApplyWorkflow` is the only tool here
-   that writes. Never call it without first showing the user the diff `ProposeWorkflow` returned and
-   getting an explicit yes.
-2. **Never fabricate a `confirmationToken`.** The server recomputes and verifies it, so a made-up
-   token is refused — the call comes back as a normal result carrying the tool's own
-   `{"error":"stale confirmationToken, re-propose and try again"}` (`isError:false`), not an HTTP
-   error. Do not treat that as a retry loop. If the token fails, re-run `ProposeWorkflow`; the
-   payload changed under you.
-3. **Never call `ExecuteWorkflow` from a step you have not read back.** After `ApplyWorkflow`,
-   confirm with `GetWorkflow` (see `inspect-run`) that the stored steps are the ones you intended.
-4. **Confirm style and format before running.** `ExecuteWorkflow` can take a saved style (`styleId`)
-   or a built-in style preset (`stylePresetKey`) — never both — and an `outputFormat`. Ask the user
-   which they want instead of choosing for them.
-5. **Ask about paid video clips before running a workflow that has one.** If the workflow contains a
-   `VideoGenerate` step, `ExecuteWorkflow` refuses to run until you pass
-   `regenerateVideoClips`: `false` reuses previously generated clips for free, `true` regenerates
-   them and costs money. Ask the user which, then pass their answer. With the flag omitted the tool
-   returns a cost estimate for you to relay.
-6. **`ExecuteWorkflow` is rate-limited** per user and project on a rolling hour. A refusal is a
-   normal result, not a bug — tell the user rather than retrying.
+1. **Propose, show, then apply.** Every `Apply*` tool writes; never call one without showing the user
+   what the matching `Propose*` returned and getting an explicit yes.
+2. **Never fabricate a `confirmationToken`.** The server recomputes it from the arguments. A stale or
+   made-up token comes back as a normal result (`isError:false`) saying to re-propose. Do not loop;
+   re-run the `Propose*` tool once with the arguments you will apply.
+3. **Lint errors are final.** A proposal with workflow errors is refused with `findings` and no
+   token. Fix the graph or pick another recipe; do not retry the same call.
+4. **Footage-sharing consent is the customer's.** Never set `allowSourceMediaEgress` yourself. See
+   the `consent-and-budget` skill.
+5. **Read back before running.** After an apply, confirm with `GetWorkflow` that the stored steps are
+   what you intended.
+6. **Ask before running.** Confirm style (`styleId` or `stylePresetKey`, never both), `outputFormat`
+   and `outputResolution` with the user. If the workflow has a `VideoGenerate` step, ask whether to
+   reuse previous clips (free) or regenerate (paid) and pass `regenerateVideoClips`.
+7. **Do not block on a run.** Follow the `run-and-watch` skill.
+
+## Custom graphs and small edits
+
+- Custom graph: `ListAgents`, then `GetStepCatalog` (one step type or all: purpose, cost class,
+  needs, what it produces) and `ListStepSchemas` before writing any config. Then `ValidateWorkflow`
+  (it also runs the linter) -> `ProposeWorkflow` -> show -> `ApplyWorkflow`.
+- One setting or a rename on an existing workflow: `ProposePatchWorkflow` / `ApplyPatchWorkflow`
+  instead of resending every step.
+- Copy a workflow, into this project or another: `ProposeCloneWorkflow` / `ApplyCloneWorkflow`.
 
 ## Reporting
 
-Say what changed, in the user's terms: which steps were added, removed or edited, and the workflow
-name. Relay any validation error text as it came back rather than summarising it into a cause.
+Say what changed in the user's terms: the workflow name, the steps added, removed or edited, and what
+still needs doing before it can run. Relay validation and lint text as it came back.

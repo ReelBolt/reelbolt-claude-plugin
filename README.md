@@ -30,7 +30,7 @@ That is all. There is no Node.js requirement, no build step, no API key and no s
 
 ```bash
 # 1. Add this repository as a plugin marketplace.
-claude plugin marketplace add vecchiotom/reelbolt-claude-plugin
+claude plugin marketplace add ReelBolt/reelbolt-claude-plugin
 
 # 2. Install the plugin. `reelbolt@reelbolt` is <plugin>@<marketplace>.
 claude plugin install reelbolt@reelbolt
@@ -102,22 +102,35 @@ Broadly, it can:
   without resending it, copy a workflow into the same or another project, and set up a green-screen
   insert from a clip and the content to show on its screen (no AI model; only processing time is
   charged).
-- **Start a run** — subject to the same hourly limit the dashboard assistant has. A run can take its
-  brief from a text file in the project instead of a pasted request.
+- **Build from a recipe** — list the built-in workflow recipes that fit a goal, check what a project
+  has and lacks, price a run before it starts, and create a workflow from a recipe with optional
+  patches. A custom graph is the fallback.
+- **Start a run and follow it without blocking** — subject to the same hourly limit the dashboard
+  assistant has. A run can take its brief from a text file in the project. Claude Code checks a run
+  with an immediate status call, a run-resource subscription, or (where installed) the
+  `reelbolt-mcp-watch` command under its Monitor tool.
+- **Look at results** — get a download link for a render, ask what is on screen in it, save a render
+  as a project file, upload a file or import one from a link, and check the credit balance.
+- **Read and change the brand design system** — colours, fonts and tagline as a draft, and reject or
+  decide pending changes. Approving a brand change is always done by you, in the app.
 - **Work with the picture open in the picture editor** — read what it is made of, look at what it
   actually shows, and propose changes such as adding text, moving or deleting layers, changing the
   canvas, or running a paid picture tool.
 
+The footage-sharing permission on a step ("allow the footage to be sent") is yours to give, in the
+app. Claude Code cannot grant it and is refused if it tries.
+
 Every change follows the dashboard's rule: Claude Code proposes it and shows you what would change,
 and nothing is written until it is confirmed. Starting a run, deleting something, and anything that
-costs money always come back to you first.
+costs money always come back to you first. Over MCP the server does not show a confirmation card, so
+Claude Code asks you itself before every write, run or paid action.
 
 **Admin tools are off by default.** Thirteen of the assistant's tools manage the deployment's own AI
-provider settings and require administrator rights. Unless they have been enabled for your account,
+provider settings, agent skills and decision calibration, and require administrator rights. Unless they have been enabled for your account,
 the catalog does not include them at all — they cannot be called by accident or by a cleverly worded
 request. When they are enabled they are listed, and they still check your own permissions on every
-call. Enabling them is a per-account setting that an administrator of your deployment sets; Claude
-Code cannot turn it on for itself.
+call. Enabling them is a setting on your own account: switch on admin tools for MCP in your user
+settings in the ReelBolt web app, then reconnect. Claude Code cannot turn it on for itself.
 
 ## What it costs
 
@@ -130,6 +143,7 @@ Credits are drawn only where the work itself costs ReelBolt money, exactly as in
 - **Starting a run** spends credits as the run's steps use paid services.
 - **Paid picture tools** and designed graphics spend credits when applied; Claude Code is shown the
   estimated cost when it proposes one, so it can tell you before you agree.
+- **Estimates** (`EstimateWorkflowRun`), readiness checks and the credit balance are free.
 - **AI-generated video clips** are the most expensive item, which is why Claude Code refuses to run
   a workflow containing them until you have chosen whether to reuse the clips from last time (free)
   or generate new ones (paid).
@@ -142,20 +156,30 @@ Credits are drawn only where the work itself costs ReelBolt money, exactly as in
 The tool set is the platform assistant's, not one invented here, and `tools/list` from the server is
 the source of truth rather than this README. The names this plugin's skills use:
 
-`ListProjects`, `GetProject`, `ListProjectFiles`, `ListAgents`, `ListStepSchemas`, `ListWorkflows`,
-`GetWorkflow`, `ListWorkflowExecutions`, `GetWorkflowExecution`, `ValidateWorkflow`,
-`ProposeWorkflow`, `ApplyWorkflow`, `ExecuteWorkflow`.
+`ListProjects`, `GetProject`, `ListProjectFiles`, `ListAgents`, `ListStepSchemas`, `GetStepCatalog`,
+`ListWorkflows`, `GetWorkflow`, `ListWorkflowTemplates`, `GetWorkflowTemplate`, `GetProjectReadiness`,
+`EstimateWorkflowRun`, `ProposeCreateFromTemplate`, `ApplyCreateFromTemplate`, `ValidateWorkflow`,
+`ProposeWorkflow`, `ApplyWorkflow`, `ProposePatchWorkflow`, `ApplyPatchWorkflow`,
+`ProposeCloneWorkflow`, `ApplyCloneWorkflow`, `ExecuteWorkflow`, `ListWorkflowExecutions`,
+`GetWorkflowExecution`, `GetExecutionStatus`, `GetCreditBalance`, `GetOutput`, `LookAtOutput`,
+`GetDesignSystem`, `ListDesignChanges`, `ProposeSaveDesignSystem`, `ApplySaveDesignSystem`,
+`ProposeDecideDesignChange`, `ApplyDecideDesignChange`.
 
-Project-scoped tools take no `projectId` argument: they read the project from a single optional
-`context` object (`projectId`, `workflowId`, `imageDocumentId`), which the MCP layer sends alongside
-the tool's own arguments. See [`skills/inspect-run/SKILL.md`](./skills/inspect-run/SKILL.md).
+`WaitForExecution` no longer exists; `GetExecutionStatus` answers at once and never waits.
+
+Project-scoped tools read the project from a single optional `context` object (`projectId`,
+`workflowId`, `imageDocumentId`), which the MCP layer sends alongside the tool's own arguments; most
+also accept an explicit `projectId` argument. See [`skills/inspect-run/SKILL.md`](./skills/inspect-run/SKILL.md).
 
 ## Skills
 
 | Skill | Invoke with | What it does |
 |---|---|---|
-| `inspect-run` | `/reelbolt:inspect-run` | Reads a project's workflows and one run's status |
-| `author-workflow` | `/reelbolt:author-workflow` | Validate → propose → confirm → apply → execute |
+| `inspect-run` | `/reelbolt:inspect-run` | Reads a project's workflows, one run's status or detail, its outputs and the credit balance |
+| `author-workflow` | `/reelbolt:author-workflow` | Recipe first, then validate → propose → confirm → apply; small patches and clones |
+| `run-and-watch` | `/reelbolt:run-and-watch` | Starts a run and waits without blocking or polling in a loop |
+| `consent-and-budget` | `/reelbolt:consent-and-budget` | Footage-sharing consent, approvals, paid work, credits, limits and sign-in |
+| `design-system` | `/reelbolt:design-system` | Reads the brand design system, saves a draft, decides pending changes |
 
 ## Self-hosted deployments
 
@@ -200,6 +224,17 @@ process is a separate setup that ships with the ReelBolt server, not with this p
 - **Calls are refused with a permissions message.** The tool exists but your account may not use
   it, or admin tools are not enabled for you. Refusals like this are answers, not crashes — they
   say what to do next.
+- **The `reelbolt-mcp-watch` command is not found, or says authentication failed.** It ships with the
+  ReelBolt server's `mcp` package, not with this plugin, and needs `INFERENCE_API_URL` and
+  `REELBOLT_MCP_TOKEN`; the browser sign-in keeps its credential inside Claude Code, so the command
+  cannot use it. Claude Code falls back to `GetExecutionStatus`, waiting `retryAfterSeconds` between
+  looks, or to a run-resource subscription.
+- **A change is refused because of footage sharing.** The permission to send footage to an outside
+  service is given by you in the app, on the step. Switch it on there, then ask again.
+- **A brand change is not approved.** Approving a design change over MCP is always refused; use the
+  Design system page or the dashboard assistant's card. Rejecting works from Claude Code.
+- **A run is refused for credits.** The message says how many more credits are needed. Add credits
+  or choose a cheaper recipe; Claude Code can price a run first with `EstimateWorkflowRun`.
 - **A run is refused because of too many runs.** The dashboard assistant and Claude Code share an
   hourly limit per person per project. The message says how many you used and how long to wait.
 - **The connection stopped after ReelBolt restarted.** Claude Code reconnects by itself; if it does
